@@ -2,7 +2,7 @@ use std::env;
 use std::fs::{self, DirEntry, File};
 use std::io::{self, stdout, BufReader, BufWriter};
 use std::io::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 
 #[macro_use]
@@ -77,7 +77,7 @@ fn run() -> Result<()> {
     let mut deps: DependencyMap = HashMap::new();
     visit_dirs(&depender_path, &collect_deps, &mut deps)?;
 
-    let filter_deps = |entry: &DirEntry, out: &mut Vec<String>| -> io::Result<()> {
+    let filter_deps = |entry: &DirEntry, out: &mut Vec<Dependee>| -> io::Result<()> {
         let path = entry
             .path()
             .file_name()
@@ -85,7 +85,8 @@ fn run() -> Result<()> {
             .expect("filename")
             .into();
         if (&deps).contains_key(&path) {
-            out.push(path);
+            let dep = Dependee{ header: path, path: entry.path().to_owned() };
+            out.push(dep);
         }
         Ok(())
     };
@@ -98,16 +99,24 @@ fn run() -> Result<()> {
     let mut out = BufWriter::new(out.lock());
 
     for dependee in dependees {
-        for v in deps.get(&dependee).expect(&dependee) {
+        let header = &dependee.header;
+        for v in deps.get(header).expect(header) {
             let depender = Path::new(&v)
                 .strip_prefix(&depender_dir)
                 .and_then(|p| Ok(p.to_str().expect("depender str")))
                 .expect(&v);
-            writeln!(out, "{} => {}", &depender, &dependee).unwrap();
+            let path = dependee_path.join(&dependee.path);
+            let path = path.strip_prefix(&dependee_dir).and_then(|p| Ok(p.to_str().unwrap())).unwrap();
+            writeln!(out, "{} => {}", &depender, path).unwrap();
         }
     }
 
     Ok(())
+}
+
+struct Dependee {
+    header: String,
+    path: PathBuf,
 }
 
 type DependencyMap = HashMap<String, Vec<String>>;
