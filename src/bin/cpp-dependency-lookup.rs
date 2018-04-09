@@ -98,6 +98,7 @@ fn run() -> Result<()> {
     let out = stdout();
     let mut out = BufWriter::new(out.lock());
 
+    let mut results : Vec<(String, String)>= Vec::new();
     for dependee in dependees {
         let header = &dependee.header;
         for v in deps.get(header).expect(header) {
@@ -107,8 +108,13 @@ fn run() -> Result<()> {
                 .expect(&v);
             let path = dependee_path.join(&dependee.path);
             let path = path.strip_prefix(&dependee_dir).and_then(|p| Ok(p.to_str().unwrap())).unwrap();
-            writeln!(out, "{} => {}", &depender, path).unwrap();
+            results.push((depender.into(), path.into()));
         }
+    }
+    results.sort_by(|a, b| (a.0).cmp(&b.0));
+
+    for (depender, path) in results {
+        writeln!(out, "{} => {}", &depender, path).unwrap();
     }
 
     Ok(())
